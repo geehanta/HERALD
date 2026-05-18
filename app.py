@@ -17,11 +17,11 @@ CORS(app)
 # ── Town metadata (coordinates + climate labels) ───────────────────────────
 TOWNS_META = [
     {"town": "Kisumu",     "county": "Kisumu",       "lat": -0.0917, "lon": 34.7680, "order": 1,
-     "climate": "Hot & Humid",         "climate_icon": "🌊", "elevation_m": 1131,
+     "climate": "Hot & Humid",         "climate_icon": "", "elevation_m": 1131,
      "top_risks": ["Malaria", "Cholera", "Typhoid"],
      "travel_tip": "High malaria zone. Use repellent, sleep under treated nets."},
     {"town": "Vihiga",     "county": "Vihiga",        "lat": 0.0796,  "lon": 34.7238, "order": 2,
-     "climate": "Wet Highlands",        "climate_icon": "🌧", "elevation_m": 1530,
+     "climate": "Wet Highlands",        "climate_icon": "", "elevation_m": 1530,
      "top_risks": ["Respiratory", "Typhoid", "GI Infections"],
      "travel_tip": "Dense population, wet climate. Respiratory infections common."},
     {"town": "Kericho",    "county": "Kericho",       "lat": -0.3686, "lon": 35.2863, "order": 3,
@@ -29,15 +29,15 @@ TOWNS_META = [
      "top_risks": ["Respiratory", "Pneumonia", "Flu"],
      "travel_tip": "Tea highland cold. Pack a warm layer, respiratory risk elevated."},
     {"town": "Nakuru",     "county": "Nakuru",        "lat": -0.3031, "lon": 36.0800, "order": 4,
-     "climate": "Rift Valley Temperate","climate_icon": "🏔", "elevation_m": 1850,
+     "climate": "Rift Valley Temperate","climate_icon": "", "elevation_m": 1850,
      "top_risks": ["GI Infections", "Flu", "Skin Infections"],
      "travel_tip": "Moderate risk zone. Stay hydrated, water quality varies."},
     {"town": "Nairobi",    "county": "Nairobi",       "lat": -1.2921, "lon": 36.8219, "order": 5,
-     "climate": "Urban Mixed",          "climate_icon": "🏙", "elevation_m": 1795,
+     "climate": "Urban Mixed",          "climate_icon": "", "elevation_m": 1795,
      "top_risks": ["Typhoid", "GI Infections", "Respiratory"],
      "travel_tip": "Urban disease mix. Avoid uncooked street food. GI risk moderate."},
     {"town": "Machakos",   "county": "Machakos",      "lat": -1.5177, "lon": 37.2634, "order": 6,
-     "climate": "Semi-Arid",            "climate_icon": "🌵", "elevation_m": 1600,
+     "climate": "Semi-Arid",            "climate_icon": "", "elevation_m": 1600,
      "top_risks": ["GI Infections", "Respiratory", "Malaria"],
      "travel_tip": "Semi-arid heat. Carry water, GI risk from dust and water quality."},
     {"town": "Emali",      "county": "Makueni",       "lat": -2.0843, "lon": 37.5031, "order": 7,
@@ -45,15 +45,15 @@ TOWNS_META = [
      "top_risks": ["GI Infections", "Dehydration", "Malaria"],
      "travel_tip": "Very hot and dry. Hydration critical. Watch for GI spikes."},
     {"town": "Voi",        "county": "Taita-Taveta",  "lat": -3.3967, "lon": 38.5560, "order": 8,
-     "climate": "Hot Savannah",         "climate_icon": "🦁", "elevation_m": 580,
+     "climate": "Hot Savannah",         "climate_icon": "", "elevation_m": 580,
      "top_risks": ["Malaria", "GI Infections", "Typhoid"],
      "travel_tip": "Malaria-endemic savannah. Net and repellent essential overnight."},
     {"town": "Mariakani",  "county": "Kilifi",        "lat": -3.8785, "lon": 39.4662, "order": 9,
-     "climate": "Coastal Hinterland",   "climate_icon": "🌴", "elevation_m": 155,
+     "climate": "Coastal Hinterland",   "climate_icon": "", "elevation_m": 155,
      "top_risks": ["Malaria", "Respiratory", "GI Infections"],
      "travel_tip": "High malaria zone approaching coast. Take prophylaxis seriously."},
     {"town": "Mombasa",    "county": "Mombasa",       "lat": -4.0435, "lon": 39.6682, "order": 10,
-     "climate": "Coastal Hot & Humid",  "climate_icon": "🌊", "elevation_m": 17,
+     "climate": "Coastal Hot & Humid",  "climate_icon": "", "elevation_m": 17,
      "top_risks": ["Malaria", "Cholera", "Dengue Risk"],
      "travel_tip": "Highest malaria risk on the corridor. Coastal cholera risk. Take precautions."},
 ]
@@ -223,19 +223,55 @@ def get_towns():
 # ── GET /api/town/<name> ───────────────────────────────────────────────────
 @app.route("/api/town/<name>")
 def get_town(name):
-    """Return full detail for one town including score history and drug breakdown."""
+    """
+    Return full detail for one town: current scores, 12-week history,
+    drug sales breakdown, climate, and traveller advice.
+
+    Accepts the same ?mode= / ?week= params as /api/towns so that the
+    right-hand detail panel always shows data for THE SAME WEEK that is
+    displayed on the map — not always the latest week.
+
+    Without this fix, clicking 'View Full Detail' on a Peak Risk bubble
+    would show latest-week (all-GREEN) data in the panel, which is
+    inconsistent with the alert colour on the map marker.
+    """
     meta = town_meta(name)
     if not meta:
         return jsonify({"error": "Town not found"}), 404
 
+    # ── Resolve the display week (same logic as /api/towns) ───────────────
+    mode     = request.args.get("mode", "")
+    week_str = request.args.get("week", "")
+
+    if mode == "peak":
+        display_week = PEAK_WEEK
+    elif mode == "latest":
+        display_week = LATEST_WEEK
+    elif week_str:
+        try:
+            display_week = pd.to_datetime(week_str)
+        except Exception:
+            display_week = LATEST_WEEK
+    else:
+        display_week = LATEST_WEEK
+
     town_scored = scored_df[scored_df["town"] == name].sort_values("week_start")
     town_sales  = sales_df[sales_df["town"] == name]
 
-    # Last 12 weeks history
+    # ── 12-week history centred around the display week ───────────────────
+    # Take the 6 weeks before and up to 5 weeks after display_week so the
+    # sparkline always shows the selected week somewhere near the right end.
+    # Fallback: just use the last 12 weeks of the full dataset.
+    week_idx = town_scored[town_scored["week_start"] <= display_week].index
+    if len(week_idx) >= 12:
+        history_rows = town_scored.loc[week_idx[-12]:]    # last 12 up to display_week
+    else:
+        history_rows = town_scored.tail(12)
+
     history = []
-    for _, row in town_scored.tail(12).iterrows():
+    for _, row in history_rows.iterrows():
         history.append({
-            "week": str(row["week_start"])[:10],
+            "week":              str(row["week_start"])[:10],
             "score_malaria":     round(float(row["score_malaria"]), 3),
             "score_gi":          round(float(row["score_gi"]), 3),
             "score_respiratory": round(float(row["score_respiratory"]), 3),
@@ -243,31 +279,33 @@ def get_town(name):
             "alert_level":       str(row["alert_level"]),
         })
 
-    # Latest week drug sales
-    latest_sales = town_sales[town_sales["week_start"] == LATEST_WEEK]
+    # ── Drug sales for the display week (not hardcoded to latest) ─────────
+    week_sales   = town_sales[town_sales["week_start"] == display_week]
     drugs_latest = {}
-    for _, row in latest_sales.iterrows():
+    for _, row in week_sales.iterrows():
         drug = str(row["drug"])
         drugs_latest[drug] = {
-            "units_sold": int(row["units_sold"]),
-            "signal":     str(row["signal"]),
-            "weight":     float(DRUG_INFO.get(drug, {}).get("weight", 0.5)),
+            "units_sold":  int(row["units_sold"]),
+            "signal":      str(row["signal"]),
+            "weight":      float(DRUG_INFO.get(drug, {}).get("weight", 0.5)),
             "description": DRUG_INFO.get(drug, {}).get("description", ""),
         }
 
-    latest_row = town_scored[town_scored["week_start"] == LATEST_WEEK]
-    current = score_row_to_dict(latest_row.iloc[0]) if len(latest_row) else {}
+    # ── Current scores for the display week ───────────────────────────────
+    current_row = town_scored[town_scored["week_start"] == display_week]
+    current     = score_row_to_dict(current_row.iloc[0]) if len(current_row) else {}
 
-    # Alert counts
+    # Overall alert counts across the full 2-year history (for reference)
     alert_counts = town_scored["alert_level"].value_counts().to_dict()
 
     return jsonify({
         **meta,
-        "current": current,
-        "advice": ALERT_ADVICE.get(current.get("alert_level", "GREEN"), ALERT_ADVICE["GREEN"]),
-        "history": history,
-        "drugs_latest": drugs_latest,
-        "alert_counts": alert_counts,
+        "current":       current,
+        "display_week":  str(display_week)[:10],
+        "advice":        ALERT_ADVICE.get(current.get("alert_level", "GREEN"), ALERT_ADVICE["GREEN"]),
+        "history":       history,
+        "drugs_latest":  drugs_latest,
+        "alert_counts":  alert_counts,
         "weeks_tracked": len(town_scored),
     })
 

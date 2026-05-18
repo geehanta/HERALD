@@ -6,8 +6,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --dark-green:   #0D4A29;
-  --mid-green:    #1A6B3C;
+  --dark-green:   #0f5058;
+  --mid-green:    #125c52;
   --light-green:  #27AE60;
   --mint:         #D6EFE0;
   --amber:        #E8A21A;
@@ -153,12 +153,7 @@ body.dark-mode .leaflet-tile { filter: saturate(0.7) brightness(0.8); }
 .herald-circle.AMBER { background: var(--amber); }
 .herald-circle.RED   { background: var(--red); }
 
-/* Pulse rings for RED */
-.pulse-ring {
-  border-radius: 50%; border: 3px solid var(--red);
-  animation: ring-expand 1.6s ease-out infinite;
-  pointer-events: none;
-}
+/* pulse-ring removed — RED markers use fill colour + sidebar dot animation */
 
 /* Town label on map */
 .map-label {
@@ -333,10 +328,7 @@ body.dark-mode .leaflet-tile { filter: saturate(0.7) brightness(0.8); }
 @keyframes subtle-pulse {
   0%,100% { opacity: 1; } 50% { opacity: .7; }
 }
-@keyframes ring-expand {
-  0%   { transform: scale(.8); opacity: 1; }
-  100% { transform: scale(2.5); opacity: 0; }
-}
+/* ring-expand removed — pulse rings no longer used on map markers */
 @keyframes fade-in {
   from { opacity: 0; } to { opacity: 1; }
 }

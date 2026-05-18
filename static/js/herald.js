@@ -138,9 +138,16 @@ function buildTownsUrl() {
   return `/api/towns?week=${STATE.currentWeek}`;  // custom / slider
 }
 
-// Fetch full detail for one town (history, drugs, weather)
+// Fetch full detail for one town (history, drugs, weather).
+// We pass the same ?mode= or ?week= that the map is using so the
+// right-hand panel always shows data for the SAME WEEK as the bubble —
+// fixes the bug where "View Full Detail" showed latest-week (all-GREEN)
+// data even when viewing the Peak Risk week on the map.
 async function loadTownDetail(townName) {
-  const res  = await fetch(`/api/town/${encodeURIComponent(townName)}`);
+  const modeParam = STATE.viewMode === 'peak'   ? '?mode=peak'
+                  : STATE.viewMode === 'latest' ? '?mode=latest'
+                  : `?week=${STATE.currentWeek}`;
+  const res  = await fetch(`/api/town/${encodeURIComponent(townName)}${modeParam}`);
   const data = await res.json();
   renderDetailPanel(data);
 }
@@ -184,9 +191,9 @@ function updateHeader() {
   document.getElementById('count-amber').textContent = `${amber} 🟡`;
   document.getElementById('count-red').textContent   = `${red} 🔴`;
 
-  const modeLabel = STATE.viewMode === 'peak'   ? '🔴 Peak Risk'
-                  : STATE.viewMode === 'latest' ? '📅 Latest'
-                  : '📆 Custom';
+  const modeLabel = STATE.viewMode === 'peak'   ? ' Peak Risk'
+                  : STATE.viewMode === 'latest' ? ' Latest'
+                  : ' Custom';
   document.getElementById('current-week').textContent =
     `${modeLabel} · ${STATE.currentWeek || ''}`;
 }
@@ -224,10 +231,9 @@ function renderTownList() {
 function renderMapMarkers() {
   // Remove all previous markers and route line
   Object.values(STATE.markers).forEach(m => STATE.map.removeLayer(m));
-  Object.values(STATE.pulseRings).forEach(r => STATE.map.removeLayer(r));
   if (STATE.routeLine) STATE.map.removeLayer(STATE.routeLine);
-  STATE.markers    = {};
-  STATE.pulseRings = {};
+  STATE.markers  = {};
+  STATE.pulseRings = {};  // kept in state for safety but no longer populated
 
   // Dashed polyline connecting towns in corridor order
   const latLons = [...STATE.towns]
@@ -245,16 +251,11 @@ function renderMapMarkers() {
     const level  = town.alert_level;
     const color  = COLORS[level];
 
-    // Bubble size scales with composite score so higher-risk towns are bigger
+    // Bubble size scales with composite score so higher-risk towns are bigger.
+    // Pulse rings have been removed — the RED fill colour and the pulsing
+    // dot in the sidebar list give sufficient visual urgency without the
+    // looping ring animation distracting from the map.
     const radius = 10 + (town.score_composite * 22);
-
-    // Animated ring behind RED markers for visual urgency
-    if (level === 'RED') {
-      STATE.pulseRings[town.town] = L.circleMarker([town.lat, town.lon], {
-        radius: radius + 9, color, weight: 2,
-        opacity: 0.4, fill: false, className: 'pulse-ring',
-      }).addTo(STATE.map);
-    }
 
     // Main filled bubble
     const marker = L.circleMarker([town.lat, town.lon], {
@@ -520,7 +521,7 @@ async function startJourney() {
 
 function runJourneyStep(stops, idx) {
   if (idx >= stops.length) {
-    setJourneyProgress(100, '✅ Journey complete! Mombasa reached.');
+    setJourneyProgress(100, ' Journey complete! Enjoy Mombasa.');
     STATE.journeyActive = false;
     return;
   }
@@ -540,14 +541,16 @@ function runJourneyStep(stops, idx) {
 
   STATE.journeyStep = idx;
 
-  // Always show modal on first/last town and for any non-GREEN alert
+  // Always show modal on first/last town and for any non-GREEN alert.
+  // Auto-advance timer: 14 seconds — long enough for the user to read
+  // the advice, scores and travel tip before moving to the next stop.
+  // The "Continue Journey →" button dismisses it immediately if needed.
   if (stop.alert_level !== 'GREEN' || idx === 0 || idx === stops.length - 1) {
     setTimeout(() => showJourneyAlert(stop), 800);
-    // Auto-advance after 6s if user doesn't dismiss manually
     STATE.journeyTimer = setTimeout(() => {
       closeAlert();
       runJourneyStep(stops, idx + 1);
-    }, 6000);
+    }, 14000);   // 14 seconds before auto-advancing
   } else {
     // GREEN town — brief pause then continue automatically
     STATE.journeyTimer = setTimeout(() => runJourneyStep(stops, idx + 1), 1800);
@@ -647,14 +650,14 @@ function initThemeToggle() {
       // which make geographic features nearly invisible on Kenya's terrain.
       document.body.classList.remove('light-mode');
       document.body.classList.add('dark-mode');
-      btn.textContent = '☀️';
+      btn.textContent = '☀️ Light';
     } else {
       // ── Switching to light mode ────────────────────────────────────
       // Remove dark-mode class — the CSS filter is no longer applied
       // and OSM tiles render normally showing Kenya clearly.
       document.body.classList.remove('dark-mode');
       document.body.classList.add('light-mode');
-      btn.textContent = '🌙';
+      btn.textContent = '🌙 Dark';
     }
 
     // Re-render markers so popup/label colours update for new theme
