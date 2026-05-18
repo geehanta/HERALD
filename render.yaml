@@ -1,10 +1,8 @@
-# render.yaml — Render.com deployment configuration
-
 services:
   - type: web
     name: herald-app
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install --only-binary=:all: -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: PYTHON_VERSION
