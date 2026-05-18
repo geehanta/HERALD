@@ -1,0 +1,14 @@
+# render.yaml — Render.com deployment configuration
+# Commit this file to the root of your GitHub repo.
+# On Render: New → Blueprint → connect repo → it reads this file automatically.
+ 
+services:
+  - type: web
+    name: herald-app
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true   # re-deploys automatically on every git push
