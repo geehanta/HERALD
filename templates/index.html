@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HERALD — Health & Epidemic Risk Alerts</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════ HEADER ══════════════════════════ -->
+<header class="herald-header">
+  <div class="header-brand">
+    <span class="header-logo">H</span>
+    <div>
+      <div class="header-title">HERALD</div>
+      <div class="header-sub">Health &amp; Epidemic Risk Alerts from Live Drug Data</div>
+    </div>
+  </div>
+  <div class="header-route">
+    <span class="route-dot dot-start">●</span>
+    <span class="route-label">Kisumu</span>
+    <span class="route-arrow">→</span>
+    <span class="route-label">Nairobi</span>
+    <span class="route-arrow">→</span>
+    <span class="route-label">Mombasa</span>
+    <span class="route-dot dot-end">●</span>
+  </div>
+  <div class="header-meta">
+    <div class="meta-pill green-pill" id="count-green">— 🟢</div>
+    <div class="meta-pill amber-pill" id="count-amber">— 🟡</div>
+    <div class="meta-pill red-pill"   id="count-red">— 🔴</div>
+    <div class="meta-week" id="current-week">Loading…</div>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme">🌙</button>
+  </div>
+</header>
+
+<!-- ══════════════════════════ MAIN LAYOUT ══════════════════════════ -->
+<div class="main-layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="section-title">📍 CORRIDOR ALERTS</div>
+      <div id="town-list" class="town-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">⏱ WEEK SELECTOR</div>
+
+      <!-- ── View mode toggle ──────────────────────────────────────────
+           Two buttons let the user instantly jump between:
+           • Latest Week  — the most recent week in the dataset
+           • Peak Risk    — the week with the highest average composite
+                            score across all 10 towns (most outbreaks)
+           The active button is highlighted green. Choosing either button
+           overrides the slider and reloads the map for that week.
+      ────────────────────────────────────────────────────────────── -->
+      <div class="view-mode-toggle">
+        <button class="vmb" id="vmb-latest" onclick="setViewMode('latest')">📅 Latest Week</button>
+        <button class="vmb vmb-active" id="vmb-peak"   onclick="setViewMode('peak')">🔴 Peak Risk</button>
+      </div>
+
+      <input type="range" id="week-slider" class="week-slider" min="0" max="104" value="104" step="1" />
+      <div class="week-label" id="week-slider-label">Latest Week</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">🚗 JOURNEY SIMULATION</div>
+      <p class="sim-desc">Simulate travelling the full corridor and receive alerts at each county boundary.</p>
+      <button class="btn-journey" id="btn-start-journey">▶ Start Journey</button>
+      <button class="btn-journey btn-secondary" id="btn-reset-journey" style="display:none">↺ Reset</button>
+      <div class="journey-progress" id="journey-progress" style="display:none">
+        <div class="jp-bar-wrap"><div class="jp-bar" id="jp-bar"></div></div>
+        <div class="jp-label" id="jp-label">Departing Kisumu…</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAP -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <!-- Journey vehicle overlay -->
+    <div class="vehicle-marker" id="vehicle-marker" style="display:none">🚌</div>
+  </div>
+
+  <!-- RIGHT PANEL — Town Detail -->
+  <aside class="detail-panel" id="detail-panel">
+    <div class="dp-placeholder" id="dp-placeholder">
+      <div class="dp-icon">📍</div>
+      <div class="dp-hint">Click any town bubble on the map to see its full health risk breakdown</div>
+    </div>
+    <div id="dp-content" style="display:none">
+      <!-- Populated by JS -->
+    </div>
+  </aside>
+
+</div>
+
+<!-- ══════════════════════════ ALERT MODAL ══════════════════════════ -->
+<div class="alert-overlay" id="alert-overlay" style="display:none">
+  <div class="alert-modal" id="alert-modal">
+    <div class="am-header" id="am-header">
+      <div class="am-level" id="am-level">🔴 ALERT</div>
+      <div class="am-town" id="am-town">Entering Mombasa County</div>
+      <button class="am-close" onclick="closeAlert()">✕</button>
+    </div>
+    <div class="am-body">
+      <div class="am-summary" id="am-summary"></div>
+      <div class="am-scores" id="am-scores"></div>
+      <div class="am-actions" id="am-actions"></div>
+      <div class="am-tip" id="am-tip"></div>
+    </div>
+    <div class="am-footer">
+      <button class="btn-continue" onclick="closeAlert()">Continue Journey →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/herald.js"></script>
+</body>
+</html>
