@@ -1,6 +1,10 @@
-flask==3.0.3
+# HERALD — Python dependencies
+# Pinned to versions with pre-built wheels for Python 3.11
+# (avoids source compilation errors on Render/Railway)
+
+Flask==3.0.3
 flask-cors==4.0.1
 pandas==2.2.2
 numpy==1.26.4
 gunicorn==22.0.0
-faker==25.9.1
+Faker==25.9.1
